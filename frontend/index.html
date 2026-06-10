@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DiskManager</title>
+    <link rel="stylesheet" href="/assets/css/style.css">
+    <script src="/assets/js/echarts.min.js"></script>
+</head>
+<body>
+    <!-- 顶部导航 -->
+    <header class="top-bar">
+        <div class="logo" onclick="showPage('dashboard')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="2" y="3" width="20" height="14" rx="2"/>
+                <line x1="8" y1="21" x2="16" y2="21"/>
+                <line x1="12" y1="17" x2="12" y2="21"/>
+            </svg>
+            DiskManager
+        </div>
+        <div class="nav-links">
+            <button class="nav-btn active" id="nav-dashboard" onclick="showPage('dashboard')">概览</button>
+            <button class="nav-btn" id="nav-scan" onclick="showPage('scan')" style="display:none">扫描结果</button>
+        </div>
+    </header>
+
+    <div class="main-content">
+        <!-- Dashboard 页面 -->
+        <div id="page-dashboard" class="page active">
+            <!-- 磁盘卡片 -->
+            <div id="disk-cards" class="disk-cards"></div>
+
+            <!-- 扫描面板 -->
+            <div class="scan-panel">
+                <h3>📂 快速扫描</h3>
+                <div class="scan-input-group">
+                    <input type="text" id="scan-path" class="scan-input"
+                           placeholder="输入目录路径，如 C:\Users\ASUS"
+                           list="path-suggestions">
+                    <datalist id="path-suggestions"></datalist>
+                    <button class="scan-btn" id="scan-btn" onclick="startScan()">开始扫描</button>
+                </div>
+                <div class="scan-options">
+                    <label><input type="checkbox" id="opt-exclude-sys" checked> 排除系统目录</label>
+                    <label><input type="checkbox" id="opt-exclude-git" checked> 排除 .git</label>
+                </div>
+            </div>
+
+            <!-- 扫描进度 -->
+            <div id="scan-progress" class="scan-progress">
+                <div style="display:flex;align-items:center;gap:12px;">
+                    <div class="loading-spinner"></div>
+                    <span id="progress-text">正在扫描...</span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-bar-fill" id="progress-fill"></div>
+                </div>
+                <div class="progress-info">
+                    <span id="progress-files">已扫描 0 个文件</span>
+                    <span class="speed" id="progress-speed"></span>
+                </div>
+            </div>
+
+            <!-- 扫描历史 -->
+            <div class="scan-panel">
+                <h3>📋 扫描历史</h3>
+                <table class="history-table" id="history-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>路径</th>
+                            <th>大小</th>
+                            <th>文件数</th>
+                            <th>耗时</th>
+                            <th>状态</th>
+                            <th>时间</th>
+                        </tr>
+                    </thead>
+                    <tbody id="history-body"></tbody>
+                </table>
+                <div id="history-empty" class="empty-state" style="display:none">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
+                    </svg>
+                    <h3>还没有扫描记录</h3>
+                    <p>输入目录路径开始第一次扫描</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 扫描详情页面 -->
+        <div id="page-scan" class="page">
+            <div class="scan-header">
+                <h2>
+                    <span id="scan-title">扫描结果</span>
+                    <span class="status-badge completed" id="scan-status-badge">已完成</span>
+                </h2>
+                <button class="back-btn" onclick="showPage('dashboard')">← 返回概览</button>
+            </div>
+
+            <!-- 面包屑 -->
+            <div id="breadcrumb" class="breadcrumb"></div>
+
+            <div class="scan-detail-layout">
+                <div>
+                    <!-- TreeMap -->
+                    <div class="treemap-container">
+                        <div id="treemap-chart" class="treemap-chart"></div>
+                    </div>
+
+                    <!-- Tab 切换 -->
+                    <div class="tabs">
+                        <button class="tab-btn active" onclick="switchTab('content')">目录内容</button>
+                        <button class="tab-btn" onclick="switchTab('topfiles')">大文件排行</button>
+                        <button class="tab-btn" onclick="switchTab('types')">类型统计</button>
+                    </div>
+                    <div class="tab-content">
+                        <div id="tab-content" class="tab-pane active">
+                            <table class="data-table" id="content-table">
+                                <thead>
+                                    <tr>
+                                        <th>名称</th>
+                                        <th>大小</th>
+                                        <th>类型</th>
+                                        <th>占比</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="content-body"></tbody>
+                            </table>
+                        </div>
+                        <div id="tab-topfiles" class="tab-pane" style="display:none">
+                            <table class="data-table" id="topfiles-table">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>名称</th>
+                                        <th>大小</th>
+                                        <th>扩展名</th>
+                                        <th>路径</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="topfiles-body"></tbody>
+                            </table>
+                        </div>
+                        <div id="tab-types" class="tab-pane" style="display:none">
+                            <div id="types-pie" class="pie-chart-container"></div>
+                            <div id="types-list" class="type-list"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右侧信息面板 -->
+                <div>
+                    <div class="info-panel">
+                        <h4>📊 目录信息</h4>
+                        <div class="info-row">
+                            <span class="label">路径</span>
+                            <span class="value" id="info-path">-</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="label">总大小</span>
+                            <span class="value" id="info-size">-</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="label">文件数</span>
+                            <span class="value" id="info-files">-</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="label">目录数</span>
+                            <span class="value" id="info-dirs">-</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="label">错误数</span>
+                            <span class="value" id="info-errors">-</span>
+                        </div>
+                    </div>
+
+                    <div class="info-panel" style="margin-top:16px">
+                        <h4>🎨 文件类型分布</h4>
+                        <div id="info-types" class="type-list"></div>
+                    </div>
+
+                    <div class="info-panel" style="margin-top:16px;display:none" id="errors-panel">
+                        <h4 style="cursor:pointer" onclick="toggleErrors()">
+                            ⚠️ 扫描错误 <span id="errors-toggle" style="font-size:12px;color:var(--text-muted)">▶ 展开</span>
+                        </h4>
+                        <div id="errors-summary"></div>
+                        <div id="errors-detail" style="display:none;max-height:260px;overflow-y:auto;margin-top:8px"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast" class="toast"></div>
+
+    <!-- 底部状态栏 -->
+    <div class="status-bar">
+        <span id="status-text">就绪</span>
+        <span>DiskManager v1.0</span>
+    </div>
+
+    <script src="/assets/js/api.js"></script>
+    <script src="/assets/js/treemap.js"></script>
+    <script src="/assets/js/app.js"></script>
+</body>
+</html>
