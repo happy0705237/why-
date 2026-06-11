@@ -44,6 +44,7 @@
                     <label><input type="checkbox" id="opt-exclude-sys" checked> 排除系统目录</label>
                     <label><input type="checkbox" id="opt-exclude-git" checked> 排除 .git</label>
                 </div>
+                <div id="quick-paths" class="quick-paths" style="display:none"></div>
             </div>
 
             <!-- 扫描进度 -->
@@ -74,6 +75,7 @@
                             <th>耗时</th>
                             <th>状态</th>
                             <th>时间</th>
+                            <th>操作</th>
                         </tr>
                     </thead>
                     <tbody id="history-body"></tbody>
@@ -110,9 +112,9 @@
 
                     <!-- Tab 切换 -->
                     <div class="tabs">
-                        <button class="tab-btn active" onclick="switchTab('content')">目录内容</button>
-                        <button class="tab-btn" onclick="switchTab('topfiles')">大文件排行</button>
-                        <button class="tab-btn" onclick="switchTab('types')">类型统计</button>
+                        <button class="tab-btn active" data-tab="content" onclick="switchTab('content')">目录内容</button>
+                        <button class="tab-btn" data-tab="topfiles" onclick="switchTab('topfiles')">大文件排行</button>
+                        <button class="tab-btn" data-tab="types" onclick="switchTab('types')">类型统计</button>
                     </div>
                     <div class="tab-content">
                         <div id="tab-content" class="tab-pane active">
@@ -200,7 +202,7 @@
     <!-- 底部状态栏 -->
     <div class="status-bar">
         <span id="status-text">就绪</span>
-        <span>DiskManager v1.0</span>
+        <span>DiskManager v1.0.1</span>
     </div>
 
     <script src="/assets/js/api.js"></script>

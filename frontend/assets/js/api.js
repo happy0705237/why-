@@ -52,6 +52,7 @@ async function apiDelete(path) {
 // API 端点
 const API = {
     getDisks: () => apiGet('/api/disks'),
+    getCommonPaths: () => apiGet('/api/common-paths'),
     createScan: (data) => apiPost('/api/scan', data),
     getScan: (id) => apiGet(`/api/scan/${id}`),
     deleteScan: (id) => apiDelete(`/api/scan/${id}`),

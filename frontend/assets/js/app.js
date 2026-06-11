@@ -140,11 +140,20 @@ function quickScanDisk(mountPoint) {
     startScan();
 }
 
-function populatePathSuggestions() {
-    // 浏览器无法获取系统用户名，仅提供占位提示
-    // 用户在输入框中输入路径后由浏览器原生 datalist 提供历史
-    const datalist = document.getElementById('path-suggestions');
-    datalist.innerHTML = '';
+async function populatePathSuggestions() {
+    try {
+        const res = await API.getCommonPaths();
+        const paths = (res.data.paths || []).filter(p => p.exists);
+        const container = document.getElementById('quick-paths');
+        if (!container) return;
+        if (paths.length === 0) { container.style.display = 'none'; return; }
+        container.style.display = '';
+        container.innerHTML = paths.map(p =>
+            `<button class="quick-path-btn" data-action="quick-path" data-path="${escAttr(p.path)}">${esc(p.name)}</button>`
+        ).join('');
+    } catch (e) {
+        console.error('加载常用路径失败:', e);
+    }
 }
 
 async function loadScanHistory() {
@@ -162,7 +171,7 @@ async function loadScanHistory() {
 
         empty.style.display = 'none';
         tbody.innerHTML = items.map((s, i) => `
-            <tr data-action="view-scan" data-scan-id="${s.id}">
+            <tr>
                 <td>${s.id}</td>
                 <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(s.root_path)}</td>
                 <td>${formatSize(s.total_size)}</td>
@@ -170,6 +179,10 @@ async function loadScanHistory() {
                 <td>${formatDuration(s.scan_duration)}</td>
                 <td><span class="status-badge ${s.status}">${statusLabel(s.status)}</span></td>
                 <td>${formatTime(s.completed_at || s.created_at)}</td>
+                <td style="white-space:nowrap">
+                    <button class="open-location-btn" data-action="view-scan" data-scan-id="${s.id}">查看</button>
+                    ${s.status !== 'scanning' ? `<button class="open-location-btn danger" data-action="delete-scan" data-scan-id="${s.id}">删除</button>` : ''}
+                </td>
             </tr>
         `).join('');
     } catch (e) {
@@ -239,10 +252,18 @@ function startScanPolling(scanId) {
             document.getElementById('progress-speed').textContent =
                 scan.status === 'scanning' ? `${Math.round(files / Math.max(elapsed, 1))} 文件/秒` : '';
 
+            // 进度条宽度（模拟值，上限 95%）
+            const fillPct = Math.min(95, (elapsed / 30) * 100);
+            document.getElementById('progress-fill').style.width = fillPct + '%';
+
             if (scan.status === 'completed' || scan.status === 'failed' || scan.status === 'cancelled') {
                 clearInterval(state.scanPollTimer);
                 state.scanPollTimer = null;
-                progressEl.classList.remove('active');
+                document.getElementById('progress-fill').style.width = '100%';
+                setTimeout(() => {
+                    progressEl.classList.remove('active');
+                    document.getElementById('progress-fill').style.width = '0%';
+                }, 400);
 
                 const btn = document.getElementById('scan-btn');
                 btn.disabled = false;
@@ -269,6 +290,12 @@ async function viewScan(scanId) {
     state.currentScanId = scanId;
     showPage('scan');
     document.getElementById('nav-scan').style.display = '';
+
+    // 重置 Tab 到目录内容
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-pane').forEach(p => p.style.display = 'none');
+    document.querySelector('.tab-btn[data-tab="content"]').classList.add('active');
+    document.getElementById('tab-content').style.display = '';
 
     try {
         // 加载扫描信息
@@ -362,18 +389,17 @@ function renderContentTable(items, scanId) {
             ? `data-action="drill" data-scan-id="${scanId}" data-path="${escAttr(item.path)}" style="cursor:pointer"`
             : '';
 
-        // "打开位置" 按钮
-        const openPath = item.parent_path || item.path;
-        const openBtn = !isDir
-            ? `<button class="open-location-btn" data-action="open-location" data-path="${escAttr(openPath)}">打开位置</button>`
-            : '';
+        // 操作按钮：复制路径 + 打开位置（目录和文件都有）
+        const copyBtn = `<button class="open-location-btn" data-action="copy-path" data-path="${escAttr(item.path)}">复制路径</button>`;
+        const openTarget = isDir ? item.path : (item.parent_path || item.path);
+        const openBtn = `<button class="open-location-btn" data-action="open-location" data-path="${escAttr(openTarget)}">打开位置</button>`;
 
         return `<tr ${rowAttr}>
             <td>${icon} ${esc(item.name)}</td>
             <td class="size-cell">${formatSize(item.size)}</td>
             <td>${type}</td>
             <td>${item.size_percent}%</td>
-            <td>${openBtn}</td>
+            <td style="white-space:nowrap">${copyBtn} ${openBtn}</td>
         </tr>`;
     }).join('');
 }
@@ -393,7 +419,8 @@ function switchTab(tab) {
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.tab-pane').forEach(p => p.style.display = 'none');
 
-    event.target.classList.add('active');
+    const btn = document.querySelector(`.tab-btn[data-tab="${tab}"]`);
+    if (btn) btn.classList.add('active');
     document.getElementById(`tab-${tab}`).style.display = '';
 
     if (tab === 'topfiles' && state.currentScanId) {
@@ -409,6 +436,11 @@ async function loadTopFiles(scanId) {
         const items = res.data.items || [];
         const tbody = document.getElementById('topfiles-body');
 
+        if (items.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#64748B;padding:30px">暂无大文件数据</td></tr>';
+            return;
+        }
+
         tbody.innerHTML = items.map((f, i) => `
             <tr>
                 <td>${i + 1}</td>
@@ -416,7 +448,10 @@ async function loadTopFiles(scanId) {
                 <td class="size-cell">${formatSize(f.size)}</td>
                 <td>.${esc(f.extension) || '-'}</td>
                 <td style="max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#64748B">${esc(f.parent_dir)}</td>
-                <td><button class="open-location-btn" data-action="open-location" data-path="${escAttr(f.parent_dir)}">打开位置</button></td>
+                <td style="white-space:nowrap">
+                    <button class="open-location-btn" data-action="copy-path" data-path="${escAttr(f.path)}">复制路径</button>
+                    <button class="open-location-btn" data-action="open-location" data-path="${escAttr(f.parent_dir)}">打开位置</button>
+                </td>
             </tr>
         `).join('');
     } catch (e) {
@@ -434,6 +469,10 @@ async function loadTypeStats(scanId) {
 
         // 渲染列表
         const listEl = document.getElementById('types-list');
+        if (!data.categories || data.categories.length === 0) {
+            listEl.innerHTML = '<div style="text-align:center;color:#64748B;padding:30px">暂无类型统计数据</div>';
+            return;
+        }
         listEl.innerHTML = data.categories.slice(0, 15).map(c => {
             const type = EXT_TYPE[c.extension] || 'other';
             const color = TYPE_COLORS[type] || TYPE_COLORS.other;
@@ -486,7 +525,10 @@ async function loadScanErrors(scanId, errorCount) {
 
         // 汇总行
         const summaryEl = document.getElementById('errors-summary');
-        const typeLabels = { permission: '权限不足', os_error: '系统错误', path_too_long: '路径过长' };
+        const typeLabels = {
+            permission: '权限不足', os_error: '系统错误',
+            path_too_long: '路径过长', not_found: '路径不存在', unknown: '未知错误',
+        };
         const parts = Object.entries(data.by_type || {}).map(
             ([t, n]) => `${typeLabels[t] || t}: ${n}`
         );
@@ -498,7 +540,13 @@ async function loadScanErrors(scanId, errorCount) {
         const detailEl = document.getElementById('errors-detail');
         detailEl.innerHTML = data.items.map(e => `
             <div style="padding:5px 0;border-bottom:1px solid var(--border);font-size:12px">
-                <div style="color:var(--warning);font-weight:500">${esc(e.error_type)}</div>
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                    <span style="color:var(--warning);font-weight:500">${esc(typeLabels[e.error_type] || e.error_type)}</span>
+                    <span style="display:flex;gap:4px">
+                        <button class="open-location-btn" data-action="copy-path" data-path="${escAttr(e.path)}">复制路径</button>
+                        <button class="open-location-btn" data-action="open-location" data-path="${escAttr(e.path)}">打开位置</button>
+                    </span>
+                </div>
                 <div style="color:var(--text-secondary);word-break:break-all">${esc(e.path)}</div>
                 ${e.error_message ? `<div style="color:var(--text-muted)">${esc(e.error_message)}</div>` : ''}
             </div>
@@ -552,6 +600,32 @@ async function copyPathFallback(path, msg) {
     }
 }
 
+async function copyToClipboard(path) {
+    try {
+        await navigator.clipboard.writeText(path);
+        showToast('路径已复制到剪贴板', 'success');
+    } catch {
+        const ta = document.createElement('textarea');
+        ta.value = path;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        showToast('路径已复制到剪贴板', 'success');
+    }
+}
+
+async function deleteScanRecord(scanId) {
+    try {
+        await API.deleteScan(scanId);
+        showToast('扫描记录已删除', 'success');
+        loadScanHistory();
+        if (state.currentScanId === scanId) showPage('dashboard');
+    } catch (e) {
+        showToast('删除失败: ' + e.message, 'error');
+    }
+}
+
 // ==================== 初始化 ====================
 
 /**
@@ -573,6 +647,15 @@ document.addEventListener('click', (e) => {
         if (scanId && path) loadTree(scanId, path);
     } else if (action === 'open-location') {
         openFileLocation(el.dataset.path);
+    } else if (action === 'copy-path') {
+        copyToClipboard(el.dataset.path);
+    } else if (action === 'quick-path') {
+        document.getElementById('scan-path').value = el.dataset.path;
+    } else if (action === 'delete-scan') {
+        const scanId = Number(el.dataset.scanId);
+        if (confirm('确定要删除这条扫描记录吗？此操作不可撤销。')) {
+            deleteScanRecord(scanId);
+        }
     }
 });
 

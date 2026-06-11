@@ -298,8 +298,12 @@ body {
     gap: 4px;
     margin-bottom: 16px;
     font-size: 14px;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    max-width: 100%;
 }
+.breadcrumb::-webkit-scrollbar { display: none; }
 
 .breadcrumb-item {
     color: var(--text-secondary);
@@ -581,3 +585,51 @@ body {
 ::-webkit-scrollbar-track { background: var(--bg-primary); }
 ::-webkit-scrollbar-thumb { background: var(--bg-tertiary); border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* 信息面板路径溢出 */
+#info-path {
+    word-break: break-all;
+    overflow-wrap: break-word;
+}
+
+/* 数据表格名称列溢出 */
+.data-table td:first-child {
+    max-width: 350px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* 常用路径快捷按钮 */
+.quick-paths {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.quick-path-btn {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    padding: 6px 12px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.2s;
+}
+
+.quick-path-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(59, 130, 246, 0.1);
+}
+
+/* 危险操作按钮变体 */
+.open-location-btn.danger {
+    color: var(--danger);
+    border-color: var(--danger);
+}
+.open-location-btn.danger:hover {
+    background: rgba(239, 68, 68, 0.1);
+}

@@ -185,6 +185,18 @@ async def batch_insert_scan_errors(db: aiosqlite.Connection, scan_id: int, error
     await db.commit()
 
 
+async def delete_scan(db: aiosqlite.Connection, scan_id: int) -> dict | None:
+    """删除扫描记录及其所有关联数据（级联删除 files/directories/scan_errors）"""
+    scan = await get_scan(db, scan_id)
+    if not scan:
+        return None
+    if scan["status"] == "scanning":
+        return {"conflict": True}
+    await db.execute("DELETE FROM scans WHERE id=?", (scan_id,))
+    await db.commit()
+    return {"deleted": True, "root_path": scan["root_path"]}
+
+
 async def get_scan(db: aiosqlite.Connection, scan_id: int) -> dict | None:
     """获取扫描任务信息"""
     cursor = await db.execute("SELECT * FROM scans WHERE id=?", (scan_id,))

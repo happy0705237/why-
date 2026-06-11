@@ -188,21 +188,35 @@
 
 ---
 
-#### `DELETE /api/scan/{scan_id}` — 取消/删除扫描任务
+#### `DELETE /api/scan/{scan_id}` — 删除扫描记录
 
-取消正在进行的扫描或删除已完成的扫描记录。
+删除指定扫描任务及其所有关联数据（files、directories、scan_errors 通过 ON DELETE CASCADE 级联删除）。
+
+**约束：**
+- 不能删除状态为 `scanning` 的任务（返回 409）
 
 **路径参数：**
 | 参数 | 类型 | 说明 |
 |------|------|------|
 | scan_id | integer | 扫描任务 ID |
 
-**响应：**
+**响应（200）：**
 ```json
 {
     "code": 200,
-    "message": "扫描任务已取消"
+    "message": "扫描记录已删除",
+    "data": {"root_path": "C:\\Users\\ASUS"}
 }
+```
+
+**错误响应（404）：**
+```json
+{"detail": "扫描任务不存在"}
+```
+
+**错误响应（409）：**
+```json
+{"detail": "不能删除正在扫描的任务"}
 ```
 
 ---
@@ -659,6 +673,33 @@
 {
     "stale_file_days": 90,
     "exclude_paths": ["C:\\$Recycle.Bin", "D:\\Games"]
+}
+```
+
+---
+
+### 2.8 常用路径
+
+#### `GET /api/common-paths` — 获取常用目录路径
+
+返回系统常用目录及其存在状态，用于前端快捷扫描入口。
+
+**请求参数：** 无
+
+**响应示例：**
+```json
+{
+    "code": 200,
+    "data": {
+        "paths": [
+            {"name": "项目目录", "path": "E:\\Claude工作文件\\disk-manager", "exists": true},
+            {"name": "用户目录", "path": "C:\\Users\\ASUS", "exists": true},
+            {"name": "桌面", "path": "C:\\Users\\ASUS\\Desktop", "exists": true},
+            {"name": "下载", "path": "C:\\Users\\ASUS\\Downloads", "exists": true},
+            {"name": "磁盘 C:", "path": "C:\\", "exists": true},
+            {"name": "磁盘 D:", "path": "D:\\", "exists": true}
+        ]
+    }
 }
 ```
 

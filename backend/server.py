@@ -22,7 +22,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="DiskManager",
     description="Windows 磁盘空间管理工具",
-    version="1.0.0",
+    version="1.0.1",
     lifespan=lifespan,
 )
 

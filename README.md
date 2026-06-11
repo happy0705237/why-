@@ -2,7 +2,7 @@
 
 Windows 本地磁盘空间管理工具。用 TreeMap 让目录大小"一目了然"，逐层下钻定位空间占用来源。
 
-> V1.0 MVP — 只读扫描 + 可视化分析，不做任何删除操作。
+> V1.0.1 — 常用路径快捷入口 + 操作增强 + 扫描历史管理 + UX 打磨
 
 ## 功能
 
@@ -12,8 +12,10 @@ Windows 本地磁盘空间管理工具。用 TreeMap 让目录大小"一目了�
 | 📂 目录扫描 | 递归扫描指定目录，统计文件大小、数量、目录数 |
 | 🗺️ TreeMap 可视化 | ECharts TreeMap 按文件类型着色，面积 = 大小占比 |
 | 🔍 逐层下钻 | 点击目录块进入子目录，面包屑导航可返回任意层级 |
-| 📋 大文件排行 | Top N 大文件列表，支持打开文件所在位置 |
+| 📋 大文件排行 | Top N 大文件列表，支持复制路径和打开文件位置 |
 | 📈 类型统计 | 按扩展名分组，饼图 + 列表展示空间占用分布 |
+| 📌 常用路径 | 桌面/下载/文档等常用目录一键扫描，无需手动输入 |
+| 🗑️ 历史管理 | 查看/删除扫描历史记录，级联清理关联数据 |
 | ⚡ 分批写入 | 扫描过程分批写入数据库，前端实时轮询进度 |
 | 🚫 容错扫描 | 权限不足、路径过长等错误记录到 scan_errors 表，不中断扫描 |
 
@@ -65,7 +67,7 @@ disk-manager/
 │           ├── treemap.js     # ECharts TreeMap + 饼图组件
 │           └── app.js         # 主应用逻辑（页面切换/轮询/渲染）
 ├── tests/
-│   └── test_smoke.py          # 后端 smoke test（7 个用例）
+│   └── test_smoke.py          # 后端 smoke test（10 个用例）
 ├── docs/                      # 设计文档
 ├── start.py                   # 一键启动脚本
 ├── requirements.txt           # Python 依赖
@@ -79,11 +81,13 @@ disk-manager/
 | GET | `/api/disks` | 磁盘分区信息 |
 | POST | `/api/scan` | 创建扫描任务 |
 | GET | `/api/scan/{id}` | 扫描状态 + 进度 |
-| DELETE | `/api/scan/{id}` | 取消扫描 |
+| DELETE | `/api/scan/{id}` | 删除扫描记录（级联删除关联数据） |
 | GET | `/api/scans` | 扫描历史列表 |
 | GET | `/api/scan/{id}/tree` | 目录树（支持下钻） |
 | GET | `/api/scan/{id}/files/top` | 大文件排行 |
 | GET | `/api/scan/{id}/files/types` | 文件类型统计 |
+| GET | `/api/scan/{id}/errors` | 扫描错误详情 |
+| GET | `/api/common-paths` | 常用目录路径列表 |
 | POST | `/api/open-explorer` | 在资源管理器中打开路径 |
 
 ## 技术栈
@@ -107,7 +111,7 @@ disk-manager/
 
 ## 版本规划
 
-- **V1.0** ← 当前：扫描 + TreeMap + 下钻 + 大文件 + 类型统计
+- **V1.0.1** ← 当前：常用路径 + 操作增强 + 扫描历史管理 + UX 打磨
 - **V1.1** — 清理建议引擎 + 重复文件检测
 - **V1.2** — 实时文件监控 + 趋势图 + 报告导出
 

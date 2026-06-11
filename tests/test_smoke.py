@@ -183,3 +183,72 @@ async def test_scan_errors():
     assert "by_type" in body
     assert "items" in body
     assert isinstance(body["items"], list)
+
+
+# ── 9. 常用路径 ─────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_common_paths():
+    """GET /api/common-paths 返回常用路径列表"""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        resp = await client.get("/api/common-paths")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["code"] == 200
+    paths = body["data"]["paths"]
+    assert isinstance(paths, list)
+    assert len(paths) >= 1
+    for p in paths:
+        assert "name" in p
+        assert "path" in p
+        assert "exists" in p
+    assert any(p["exists"] for p in paths)
+    project_paths = [p for p in paths if p["name"] == "项目目录"]
+    assert project_paths, "缺少项目目录快捷项"
+    assert project_paths[0]["path"] == ROOT
+    assert project_paths[0]["exists"] is True
+
+
+# ── 10. 删除扫描记录 ───────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_delete_scan_flow():
+    """DELETE /api/scan/{id} 删除已完成的扫描记录"""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        scan_path = os.path.join(ROOT, "backend")
+        resp = await client.post("/api/scan", json={"path": scan_path})
+        scan_id = resp.json()["data"]["scan_id"]
+
+        for _ in range(30):
+            resp = await client.get(f"/api/scan/{scan_id}")
+            if resp.json()["data"]["status"] in ("completed", "failed"):
+                break
+            time.sleep(0.5)
+
+        resp = await client.delete(f"/api/scan/{scan_id}")
+        assert resp.status_code == 200
+        assert resp.json()["code"] == 200
+
+        resp = await client.get(f"/api/scan/{scan_id}")
+        assert resp.status_code == 404
+
+        resp = await client.delete(f"/api/scan/{scan_id}")
+        assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_delete_running_scan_conflict():
+    """DELETE /api/scan/{id} 不应删除 scanning 状态的记录"""
+    database = await db.get_db()
+    scan_id = await db.create_scan(database, ROOT)
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        resp = await client.delete(f"/api/scan/{scan_id}")
+        assert resp.status_code == 409
+
+        resp = await client.get(f"/api/scan/{scan_id}")
+        assert resp.status_code == 200
+        assert resp.json()["data"]["status"] == "scanning"

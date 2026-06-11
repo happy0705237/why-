@@ -35,20 +35,16 @@ async def get_scan(scan_id: int):
 
 
 @router.delete("/scan/{scan_id}")
-async def cancel_scan(scan_id: int):
-    """取消/删除扫描任务"""
-    # 先尝试取消正在运行的任务
-    cancelled = await scan_service.cancel_scan(scan_id)
-    if cancelled:
-        return {"code": 200, "message": "扫描任务已取消"}
-
-    # 检查任务是否存在
+async def delete_scan(scan_id: int):
+    """删除扫描记录及其关联数据"""
     database = await db.get_db()
-    scan = await db.get_scan(database, scan_id)
-    if not scan:
+    result = await db.delete_scan(database, scan_id)
+    if result is None:
         raise HTTPException(status_code=404, detail="扫描任务不存在")
+    if result.get("conflict"):
+        raise HTTPException(status_code=409, detail="不能删除正在扫描的任务")
 
-    return {"code": 200, "message": "扫描任务已完成"}
+    return {"code": 200, "message": "扫描记录已删除", "data": {"root_path": result["root_path"]}}
 
 
 @router.get("/scans")
